@@ -6,6 +6,8 @@ def InitAllDirs():
     except: pass
     try: os.mkdir("Outputs")
     except: pass
+    try: os.remove("core.conf")
+    except: pass
     success("Initialisation terminée !")
     info("Merci de mettre vos fichiers à chiffrer dans Inputs/")
     info("Après avoir exécuter ce programme, vous trouverez les fichiers chiffrés dans Outputs/")

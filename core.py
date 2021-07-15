@@ -1,6 +1,8 @@
 from logs import *
 import sys
 from random import randint
+import glob
+import os
 class Core(object):
     def __init__(self, parameters):
         info("Initialisation du coeur de chiffrement ...")
@@ -10,7 +12,13 @@ class Core(object):
         self.alphabet = self.DetectAlphabetInParameters()
         self.key = self.DetectKeyInParameters()
         self.iterations = self.DetectIterationsOfEncryption()
+        self.FIlesTOEncrypt = []
         self.SaveConfiguration()
+        self.WaitUntilFilesSetInInputs()
+        self.GetIndexDatabase()
+        self.ShowIndexDatabase()
+        self.AskForConfirmationBeforeEncryptation()
+        self.Encryption()
     def DetectAllParameters(self):
         info("Détection des paramètres à utiliser ...")
         if len(self.parameters) == 1:
@@ -88,3 +96,67 @@ class Core(object):
         file.write("ALPHABET=" + str(self.alphabet) + "\nKEY=" + str(self.key) + "\nITERATIONS=" + str(self.iterations))
         file.close()
         success("La configuration a été sauvegardée !")
+    def WaitUntilFilesSetInInputs(self):
+        input("[.] Merci d'appuyer sur entrée quand vos fichiers et/ou dossiers à chiffrer on été déplacés dans Inputs/ ...")
+    def GetIndexDatabase(self):
+        success("Lecture de la base de données ...")
+        os.chdir("Inputs/")
+        self.FilesToEncrypt = []
+        self.HistorysSubDirs = []
+        _count = 0
+        for (directory, SubDirectory, files) in os.walk(os.getcwd()):
+            self.HistorysSubDirs.append(SubDirectory)
+            for file in range(0, len(files)):
+                if directory[len(directory) - 1] != '/': directory += '/'
+                else: pass
+                files[file] = directory + files[file]
+            self.FilesToEncrypt.extend(files)
+        os.chdir("../")
+    def ShowIndexDatabase(self):
+        success("Liste des fichiers à chiffrer : ")
+        for file in range(0, len(self.FilesToEncrypt)): print("\t- " + self.FilesToEncrypt[file])
+        info(str(len(self.FilesToEncrypt)) + " fichiers ont été détectés!")
+    def AskForConfirmationBeforeEncryptation(self):
+        if not len(self.FilesToEncrypt):
+            error("Aucun fichier n'est à chiffrer!")
+            sys.exit(0)
+        elif len(self.FilesToEncrypt):
+            _choice = input("[?] Ête-vous sûr de vouloir chiffrer ce(s) fichier(s) ? oui/non >>> ").lower()
+            if _choice == "non":
+                error("Annulation du chiffrement de ce(s) fichier(s)!")
+                sys.exit(0)
+            elif _choice == "oui":
+                info("Le chiffrement va démarrer...")
+                input("[!] Pensez bien à vous souvenir des valeurs qui vont être affichées à la fin du processus!\n[!] Elles permettront de déchiffrer vos fichiers!\n[!] Pensez aussi à faire une copie de ceux-ci au cas où le chiffrement ne se passe pas correctement!\n[.] Appuyez quand vous êtes prêt...")
+            else:
+                error("Ce n'est pas une réponse attendue, elle sera considérée comme non!")
+                error("Annulation du chiffrmeent de ce(s) fichier(s)!")
+                sys.exit(0)
+        else:
+            error("Erreur pendant avec self.FilesToEncrypt!")
+            sys.exit(1)
+    def Encryption(self):
+        info("Démarrage du chiffrement ...")
+        self.CreateDirArch()
+        for file in range(0, len(self.FilesToEncrypt)):
+            info("Chiffrement de " + self.FilesToEncrypt[file] + " ...")
+            info("Récupération du contenu du fichier ...")
+            _content = self.GetContentFile(self.FilesToEncrypt[file])
+            if not _content:
+                error("Une erreur est survenue pendant la lecture du fichier!")
+                error(self.FilesToEncrypt[file] + " ne sera pas chiffré!")
+            else:
+                info("Ouverture de la sortie ...")
+                print(self.FilesToEncrypt[file].replace("Inputs", "Outputs"))
+                info("Première inversion 256 ...")
+    def GetContentFile(self, path):
+        try:
+            file = open(path, "r")
+            l = file.readlines()
+            file.close()
+            return l
+        except: return False
+    def CreateDirArch(self):
+        info("Création de l'architecture des dossiers en sortie ...")
+        print(self.HistorysSubDirs)
+        #Juste copier le dossier et réécrire dans les fichiers
