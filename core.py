@@ -3,16 +3,19 @@ import sys
 from random import randint
 import glob
 import os
+import shutil
+from time import sleep
+from datetime import datetime
 class Core(object):
     def __init__(self, parameters):
         info("Initialisation du coeur de chiffrement ...")
         self.parameters = parameters
         self.DefaultAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRTUVWXYZ0123456789"
         self.DetectAllParameters()
-        self.alphabet = self.DetectAlphabetInParameters()
+        # self.alphabet = self.DetectAlphabetInParameters()
         self.key = self.DetectKeyInParameters()
         self.iterations = self.DetectIterationsOfEncryption()
-        self.FIlesTOEncrypt = []
+        self.FilesTOEncrypt = []
         self.SaveConfiguration()
         self.WaitUntilFilesSetInInputs()
         self.GetIndexDatabase()
@@ -52,13 +55,13 @@ class Core(object):
                 try:
                     _key = self.parameters[parameter].split("=")[1]
                     if _key.lower() == "µrandom":
-                        success("Une clé aléatoire va être générée à l'aide de la taille de l'alphabet ...")
-                        return randint(0, len(self.alphabet) - 1)
+                        success("Une clé aléatoire va être générée ...")
+                        return randint(0, 1000)
                     else:
                         try:
                             success("La clé a été détectée comme étant : " + str(int(_key)) + " !")
-                            if int(_key) < 0 or int(_key) > len(self.alphabet) - 1:
-                                error("La clé doit être un nombre entier comprise entre 0 et " + str(len(self.alphabet) - 1) + " !")
+                            if int(_key) < 0 or int(_key) > 1000:
+                                error("La clé doit être un nombre entier >= 0 et <= 1000 !")
                                 sys.exit(1)
                             else: return int(_key)
                         except:
@@ -93,19 +96,19 @@ class Core(object):
     def SaveConfiguration(self):
         info("Sauvegarde de la configuration actuelle ...")
         file = open("core.conf", "w")
-        file.write("ALPHABET=" + str(self.alphabet) + "\nKEY=" + str(self.key) + "\nITERATIONS=" + str(self.iterations))
+        file.write("KEY=" + str(self.key) + "\nITERATIONS=" + str(self.iterations))
         file.close()
         success("La configuration a été sauvegardée !")
     def WaitUntilFilesSetInInputs(self):
-        input("[.] Merci d'appuyer sur entrée quand vos fichiers et/ou dossiers à chiffrer on été déplacés dans Inputs/ ...")
+        input("[.] Merci d'appuyer sur entrée quand vos fichiers et/ou dossiers à chiffrer ont été déplacés dans Inputs/ ...")
     def GetIndexDatabase(self):
         success("Lecture de la base de données ...")
         os.chdir("Inputs/")
         self.FilesToEncrypt = []
-        self.HistorysSubDirs = []
+        # self.HistorysSubDirs = []
         _count = 0
         for (directory, SubDirectory, files) in os.walk(os.getcwd()):
-            self.HistorysSubDirs.append(SubDirectory)
+            # self.HistorysSubDirs.append(SubDirectory)
             for file in range(0, len(files)):
                 if directory[len(directory) - 1] != '/': directory += '/'
                 else: pass
@@ -136,9 +139,12 @@ class Core(object):
             error("Erreur pendant avec self.FilesToEncrypt!")
             sys.exit(1)
     def Encryption(self):
+        print("#"*50)
         info("Démarrage du chiffrement ...")
         self.CreateDirArch()
+        self.SetOutput()
         for file in range(0, len(self.FilesToEncrypt)):
+            OutputFile = ""
             info("Chiffrement de " + self.FilesToEncrypt[file] + " ...")
             info("Récupération du contenu du fichier ...")
             _content = self.GetContentFile(self.FilesToEncrypt[file])
@@ -148,7 +154,16 @@ class Core(object):
             else:
                 info("Ouverture de la sortie ...")
                 print(self.FilesToEncrypt[file].replace("Inputs", "Outputs"))
-                info("Première inversion 256 ...")
+                output = open(self.OutputsIndex[file], "w")
+                OutputFile = "".join(self.ReverseString256(_content))
+                OutputFile = self.AddKey(OutputFile)
+                OutputFile = self.FinalEncryption(OutputFile)
+                output.write(OutputFile)
+                output.close()
+                success(self.FilesToEncrypt[file] + " a bien été chiffré!")
+        self.SaveOutputConfiguration()
+        print("#"*50)
+        success("Le chiffrement s'est terminé avec succès !")
     def GetContentFile(self, path):
         try:
             file = open(path, "r")
@@ -158,5 +173,47 @@ class Core(object):
         except: return False
     def CreateDirArch(self):
         info("Création de l'architecture des dossiers en sortie ...")
-        print(self.HistorysSubDirs)
-        #Juste copier le dossier et réécrire dans les fichiers
+        shutil.rmtree("Outputs/")
+        shutil.copytree("Inputs/", "Outputs")
+        info("Création du nouveau index ...")
+        self.OutputsIndex = []
+        for file in range(0, len(self.FilesToEncrypt)):
+            self.OutputsIndex.append(self.FilesToEncrypt[file].replace("Inputs", "Outputs"))
+            success(self.OutputsIndex[file])
+    def ReverseString256(self, text):
+        #Prend le _content d'un fichier
+        info("Inversion ascii ...")
+        _ascii_input = []
+        text = list("".join(text))
+        for char in range(0, len(text)): text[char] = chr(255 - ord(text[char]))
+        return text
+    def AddKey(self, text):
+        info("Ajout de la clé ...")
+        text = list(text)
+        for char in range(0, len(text)): text[char] = chr(ord(text[char]) + int(self.OutputToSave[0]))
+        return "".join(text)
+    def FinalEncryption(self, text):
+        info("Finalisation du chiffrement ...")
+        text = list(text)
+        for char in range(0, len(text)): text[char] = chr(ord(text[char]) + abs(int(self.OutputToSave[2]) - int(self.OutputToSave[3]) + int(self.OutputToSave[4]) + int(self.OutputToSave[5]) + int(self.OutputToSave[6])))
+        return "".join(text)
+    def SetOutput(self):
+        info("Préparation du fichier de sortie ...")
+        self.OutputToSave = []
+        self.OutputToSave.append(str(self.key))
+        self.OutputToSave.append(str(datetime.now().year))
+        self.OutputToSave.append(str(datetime.now().month))
+        self.OutputToSave.append(str(datetime.now().day))
+        self.OutputToSave.append(str(datetime.now().hour))
+        self.OutputToSave.append(str(datetime.now().minute))
+        self.OutputToSave.append(str(datetime.now().second))
+    def SaveOutputConfiguration(self):
+        info("Enregistrement de la configuration de déchiffrement ...")
+        file = open("output.unenc", "w")
+        for element in range(0, len(self.OutputToSave)): file.write(self.OutputToSave[element] + '\n')
+        file.close()
+        OutputEncrypt = self.ReverseString256(self.GetContentFile("output.unenc"))
+        file = open("output.unenc", "w")
+        file.write("".join(OutputEncrypt))
+        file.close()
+        success("Le fichier de sortie a été écrit avec succès !")
